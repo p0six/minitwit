@@ -19,8 +19,7 @@ from werkzeug import check_password_hash, generate_password_hash
 
 
 # configuration
-#DATABASE = '/tmp/minitwit.db'
-DATABASE = '/Users/mromero/Documents/University/CPSC 476/flask/examples/minitwit/minitwit/minitwit.db'
+DATABASE = '/tmp/minitwit.db'
 PER_PAGE = 30
 DEBUG = True
 SECRET_KEY = b'_5#y2L"F4Q8z\n\xec]/'
