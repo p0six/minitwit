@@ -65,6 +65,21 @@ def initdb_command():
     print('Initialized the database.')
 
 
+def populate_db():
+    """Initializes the database."""
+    db = get_db()
+    with app.open_resource('populate.sql', mode='r') as f:
+        db.cursor().executescript(f.read())
+    db.commit()
+
+
+@app.cli.command('populatedb')
+def populatedb_command():
+    """Populate the database tables."""
+    populate_db()
+    print('Populated the database.')
+
+
 def query_db(query, args=(), one=False):
     """Queries the database and returns a list of dictionaries."""
     cur = get_db().execute(query, args)
@@ -131,24 +146,60 @@ return jsonify(username=g.user.username,
 # show the timeline for the authenticated user
 @app.route('/api/statuses/home_timeline', methods=['GET'])
 def api_home_timeline():
-    messages=query_db('''
-      select message.*, user.* from message, user
-      where message.author_id = user.user_id
-      order by message.pub_date desc limit ?''', [PER_PAGE])
+    if not g.user:
+        return redirect(url_for('api_public_timeline'))
+    messages = query_db('''
+            select message.*, user.* from message, user
+            where message.author_id = user.user_id and (
+                user.user_id = ? or
+                user.user_id in (select whom_id from follower where who_id = ?))
+            order by message.pub_date desc limit ?''',
+                        [session['user_id'], session['user_id'], PER_PAGE])
     my_values = []
     for message in messages:
-        my_values.append({'username':message[5], 'email':message[6], 'text':message[2], 'datetime':format_datetime(message[3])})
+        my_values.append(
+            {'username': message[5], 'email': message[6], 'text': message[2], 'datetime': format_datetime(message[3])})
+        print message
     return Response(json.dumps(my_values), 200, mimetype='application/json');
 
 # show the public timeline for everyone
 @app.route('/api/statuses/public_timeline', methods=['GET'])
 def api_public_timeline():
-    return "hello"
+    messages = query_db('''
+          select message.*, user.* from message, user
+          where message.author_id = user.user_id
+          order by message.pub_date desc limit ?''', [PER_PAGE])
+    my_values = []
+    for message in messages:
+        my_values.append(
+            {'username': message[5], 'email': message[6], 'text': message[2], 'datetime': format_datetime(message[3])})
+    return Response(json.dumps(my_values), 200, mimetype='application/json');
 
 # show messages posted by username
 @app.route('/api/statuses/user_timeline/<username>', methods=['GET'])
 def api_user_timeline(username):
-    return "hello"
+    profile_user = query_db('select * from user where username = ?',
+                            [username], one=True)
+    if profile_user is None:
+        abort(404)
+    followed = False
+    if g.user:
+        followed = query_db('''select 1 from follower where
+                follower.who_id = ? and follower.whom_id = ?''',
+                [session['user_id'], profile_user['user_id']],
+                one=True) is not None
+    messages=query_db('''
+                select message.*, user.* from message, user where
+                user.user_id = message.author_id and user.user_id = ?
+                order by message.pub_date desc limit ?''',
+                [profile_user['user_id'], PER_PAGE])
+    # in the original template, if a user is logged in, there is additional text displaying whether or not you're
+    # following the user, or if the user is you
+    my_values = []
+    for message in messages:
+        my_values.append(
+            {'username': message[5], 'email': message[6], 'text': message[2], 'datetime': format_datetime(message[3])})
+    return Response(json.dumps(my_values), 200, mimetype='application/json');
 
 # add the authenticated user to the followers of the specified user
 @app.route('/api/friendships/create', methods=['POST'])
