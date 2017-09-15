@@ -14,12 +14,13 @@ from sqlite3 import dbapi2 as sqlite3
 from hashlib import md5
 from datetime import datetime
 from flask import Flask, request, session, url_for, redirect, \
-     render_template, abort, g, flash, _app_ctx_stack
+     render_template, abort, g, flash, _app_ctx_stack, json, jsonify
 from werkzeug import check_password_hash, generate_password_hash
 
 
 # configuration
-DATABASE = '/tmp/minitwit.db'
+#DATABASE = '/tmp/minitwit.db'
+DATABASE = '/Users/mromero/Documents/University/CPSC 476/flask/examples/minitwit/minitwit/minitwit.db'
 PER_PAGE = 30
 DEBUG = True
 SECRET_KEY = b'_5#y2L"F4Q8z\n\xec]/'
@@ -114,6 +115,66 @@ def timeline():
         order by message.pub_date desc limit ?''',
         [session['user_id'], session['user_id'], PER_PAGE]))
 
+'''
+
+Begin a bunch of my junk
+---------------------
+magic below
+-----------
+return jsonify(username=g.user.username,
+                   email=g.user.email,
+                   id=g.user.id)
+
+
+'''
+
+# show the timeline for the authenticated user
+@app.route('/api/statuses/home_timeline', methods=['GET'])
+def api_home_timeline():
+    messages=query_db('''
+      select message.*, user.* from message, user
+      where message.author_id = user.user_id
+      order by message.pub_date desc limit ?''', [PER_PAGE])
+
+    for message in messages:
+        return jsonify(username=message[5], email=message[6], text=message[2], datetime=format_datetime(message[3]))
+
+    return "hello"
+
+# show the public timeline for everyone
+@app.route('/api/statuses/public_timeline', methods=['GET'])
+def api_public_timeline():
+    return "hello"
+
+# show messages posted by username
+@app.route('/api/statuses/user_timeline/<username>', methods=['GET'])
+def api_user_timeline(username):
+    return "hello"
+
+# add the authenticated user to the followers of the specified user
+@app.route('/api/friendships/create', methods=['POST'])
+def api_follow_user():
+    return "hello"
+
+# remove the authenticated user from the followers of username
+@app.route('/api/friendships/<username>', methods=['DELETE'])
+def api_unfollow_user(username):
+    return "hello"
+
+# post a new message from the authenticated user
+@app.route('/api/statuses/update', methods=['POST'])
+def api_add_message():
+    return "hello"
+
+# log in the specified user
+@app.route('/api/account/verify_credentials', methods=['GET'])
+def api_login():
+    return "hello"
+
+# log out the specified user
+@app.route('/api/account/verify_credentials', methods=['DELETE'])
+def api_logout():
+    return "hello"
 
 @app.route('/public')
 def public_timeline():
