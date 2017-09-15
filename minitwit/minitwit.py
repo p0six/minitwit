@@ -14,7 +14,7 @@ from sqlite3 import dbapi2 as sqlite3
 from hashlib import md5
 from datetime import datetime
 from flask import Flask, request, session, url_for, redirect, \
-     render_template, abort, g, flash, _app_ctx_stack, json, jsonify
+     render_template, abort, g, flash, _app_ctx_stack, json, jsonify, Response
 from werkzeug import check_password_hash, generate_password_hash
 
 
@@ -135,11 +135,10 @@ def api_home_timeline():
       select message.*, user.* from message, user
       where message.author_id = user.user_id
       order by message.pub_date desc limit ?''', [PER_PAGE])
-
+    my_values = []
     for message in messages:
-        return jsonify(username=message[5], email=message[6], text=message[2], datetime=format_datetime(message[3]))
-
-    return "hello"
+        my_values.append({'username':message[5], 'email':message[6], 'text':message[2], 'datetime':format_datetime(message[3])})
+    return Response(json.dumps(my_values), 200, mimetype='application/json');
 
 # show the public timeline for everyone
 @app.route('/api/statuses/public_timeline', methods=['GET'])
