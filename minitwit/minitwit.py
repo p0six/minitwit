@@ -158,7 +158,6 @@ def api_home_timeline():
     for message in messages:
         my_values.append(
             {'username': message[5], 'email': message[6], 'text': message[2], 'datetime': format_datetime(message[3])})
-        print message
     return Response(json.dumps(my_values), 200, mimetype='application/json');
 
 # show the public timeline for everyone
