@@ -226,7 +226,7 @@ def api_unfollow_user(username):
     db.execute('delete from follower where who_id=? and whom_id=?',
               [session['user_id'], whom_id])
     db.commit()
-    return redirect(url_for('api_user_timeline', username=username))
+    return redirect(url_for('api_user_timeline', username=username), code=303)
 
 # post a new message from the authenticated user
 @app.route('/api/statuses/update', methods=['POST'])
