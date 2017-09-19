@@ -237,10 +237,10 @@ def api_add_message():
     if message_text:
         db = get_db()
         db.execute('''insert into message (author_id, text, pub_date)
-          values (?, ?, ?)''', (session['user_id'], request.form['text'],
+          values (?, ?, ?)''', (session['user_id'], message_text,
                                 int(time.time())))
         db.commit()
-    return redirect(url_for('api_timeline'), code=303)
+    return redirect(url_for('api_home_timeline'), code=303)
 
 @app.route('/public')
 def public_timeline():
