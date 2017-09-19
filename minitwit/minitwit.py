@@ -202,12 +202,31 @@ def api_user_timeline(username):
 # add the authenticated user to the followers of the specified user
 @app.route('/api/friendships/create', methods=['POST'])
 def api_follow_user():
-    return "hello"
+    if not g.user:
+        abort(401)
+    username = request.get_json()[0]["whom_id"]
+    whom_id = get_user_id(username)
+    if whom_id is None:
+        abort(404)
+    db = get_db()
+    db.execute('insert into follower (who_id, whom_id) values (?, ?)',
+              [session['user_id'], whom_id])
+    db.commit()
+    return redirect(url_for('api_user_timeline', username=username))
 
 # remove the authenticated user from the followers of username
 @app.route('/api/friendships/<username>', methods=['DELETE'])
 def api_unfollow_user(username):
-    return "hello"
+    if not g.user:
+        abort(401)
+    whom_id = get_user_id(username)
+    if whom_id is None:
+        abort(404)
+    db = get_db()
+    db.execute('delete from follower where who_id=? and whom_id=?',
+              [session['user_id'], whom_id])
+    db.commit()
+    return redirect(url_for('api_user_timeline', username=username))
 
 # post a new message from the authenticated user
 @app.route('/api/statuses/update', methods=['POST'])
