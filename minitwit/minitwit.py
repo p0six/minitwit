@@ -231,7 +231,16 @@ def api_unfollow_user(username):
 # post a new message from the authenticated user
 @app.route('/api/statuses/update', methods=['POST'])
 def api_add_message():
-    return "hello"
+    if 'user_id' not in session:
+        abort(401)
+    message_text = request.get_json()[0]["message"]
+    if message_text:
+        db = get_db()
+        db.execute('''insert into message (author_id, text, pub_date)
+          values (?, ?, ?)''', (session['user_id'], request.form['text'],
+                                int(time.time())))
+        db.commit()
+    return redirect(url_for('api_timeline'), code=303)
 
 @app.route('/public')
 def public_timeline():
