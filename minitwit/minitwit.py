@@ -313,7 +313,8 @@ def api_login():
 # log out the specified user
 @app.route('/api/account/verify_credentials', methods=['DELETE'])
 def api_logout():
-    return "hello"
+    session.pop('user_id', None)
+    return redirect(url_for('api_public_timeline'), code=303)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
