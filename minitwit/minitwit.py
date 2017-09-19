@@ -161,7 +161,7 @@ def api_home_timeline():
     return Response(json.dumps(my_values), 200, mimetype='application/json');
 
 # show the public timeline for everyone
-@app.route('/api/statuses/public_timeline', methods=['GET'])
+@app.route('/api/statuses/public_timeline', methods=['GET','DELETE'])
 def api_public_timeline():
     messages = query_db('''
           select message.*, user.* from message, user
@@ -313,7 +313,8 @@ def api_login():
 # log out the specified user
 @app.route('/api/account/verify_credentials', methods=['DELETE'])
 def api_logout():
-    return "hello"
+    session.pop('user_id', None)
+    return redirect(url_for('api_public_timeline'),code=303)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
