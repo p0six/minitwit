@@ -214,16 +214,6 @@ def api_unfollow_user(username):
 def api_add_message():
     return "hello"
 
-# log in the specified user
-@app.route('/api/account/verify_credentials', methods=['GET'])
-def api_login():
-    return "hello"
-
-# log out the specified user
-@app.route('/api/account/verify_credentials', methods=['DELETE'])
-def api_logout():
-    return "hello"
-
 @app.route('/public')
 def public_timeline():
     """Displays the latest messages of all users."""
@@ -300,6 +290,30 @@ def add_message():
         flash('Your message was recorded')
     return redirect(url_for('timeline'))
 
+
+# log in the specified user
+@app.route('/api/account/verify_credentials', methods=['GET', 'POST'])
+def api_login():
+    if g.user:
+        return redirect(url_for('api_home_timeline'))
+    error = None
+    if request.method == 'POST':
+        json_data = request.get_json()
+        user = query_db('''select * from user where
+            username = ?''', [json_data[0]["username"]], one=True)
+        if user is None:
+            error = 'Invalid username'
+        elif not check_password_hash(user['pw_hash'], json_data[0]["password"]):
+            error = 'Invalid password'
+        else:
+            session['user_id'] = user['user_id']
+            return redirect(url_for('api_home_timeline'))
+    return 'not logged in'
+
+# log out the specified user
+@app.route('/api/account/verify_credentials', methods=['DELETE'])
+def api_logout():
+    return "hello"
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
