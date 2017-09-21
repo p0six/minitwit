@@ -320,18 +320,20 @@ def add_message():
 
 
 # log in the specified user
-@app.route('/api/account/verify_credentials', methods=['GET', 'POST'])
+@app.route('/api/account/verify_credentials', methods=['GET'])
 def api_login():
     if g.user:
         return redirect(url_for('api_home_timeline'))
     error = None
-    if request.method == 'POST':
-        json_data = request.get_json()
+    if request.method == 'GET':
+        # json_data = request.get_json()
+        my_args = request.args.to_dict();
+        print my_args["username"]
         user = query_db('''select * from user where
-            username = ?''', [json_data[0]["username"]], one=True)
+            username = ?''', [my_args["username"]], one=True)
         if user is None:
             error = 'Invalid username'
-        elif not check_password_hash(user['pw_hash'], json_data[0]["password"]):
+        elif not check_password_hash(user['pw_hash'], my_args["password"]):
             error = 'Invalid password'
         else:
             session['user_id'] = user['user_id']
