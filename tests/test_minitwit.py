@@ -12,6 +12,7 @@ import os
 import tempfile
 import pytest
 from minitwit import minitwit
+from flask import json
 
 
 @pytest.fixture
@@ -67,6 +68,50 @@ def add_message(client, text):
     if text:
         assert b'Your message was recorded' in rv.data
     return rv
+
+
+'''
+--------------------------------------
+| BEGIN: API Testing Assist Functions
+--------------------------------------
+'''
+
+
+def api_login(client, username, password):
+    """Helper function to login"""
+    return client.get('/api/account/verify_credentials', query_string ={
+        'username': username,
+        'password': password
+    }, follow_redirects=True)
+
+
+def api_logout(client):
+    """Helper function to logout"""
+    return client.delete('/api/account/verify_credentials', follow_redirects=True)
+
+
+def api_register_and_login(client, username, password):
+    """Registers and logs in in one go"""
+    register(client, username, password) # uses original, as API requirements do not include a register function
+    return api_login(client, username, password)
+
+
+def api_add_message(client, text):
+    """Records a message"""
+    my_message = []
+    my_message.append({'message': text})
+    rv = client.post('/api/statuses/update', data=json.dumps(my_message),
+                     content_type='application/json')
+    if text:
+        assert b'successfulMessage' in rv.data
+    return rv
+
+
+'''
+--------------------------------------
+| END: API Testing Assist Functions
+--------------------------------------
+'''
 
 
 def test_register(client):
@@ -147,3 +192,88 @@ def test_timelines(client):
     rv = client.get('/')
     assert b'the message by foo' not in rv.data
     assert b'the message by bar' in rv.data
+
+
+'''
+----------------------------
+| BEGIN: New API Unit Tests
+----------------------------
+'''
+
+
+def test_api_login_logout(client):
+    """Make sure logging in and logging out works"""
+    rv = api_register_and_login(client, 'user1', 'default')
+    assert b'loginSuccessful' in rv.data
+    rv = api_logout(client)
+    assert b'logoutSuccessful' in rv.data
+    rv = api_login(client, 'user1', 'wrongpassword')
+    assert b'Invalid password' in rv.data
+    rv = api_login(client, 'user2', 'wrongpassword')
+    assert b'Invalid username' in rv.data
+
+
+def test_api_message_recording(client):
+    """Check if adding messages works"""
+    api_register_and_login(client, 'foo', 'default')
+    api_add_message(client, 'api test message 1')
+    api_add_message(client, '<api test message 2>')
+    rv = client.get('/')
+    assert b'api test message 1' in rv.data
+    assert b'&lt;api test message 2&gt;' in rv.data
+
+
+def test_api_timelines(client):
+    """Make sure that timelines work"""
+    api_register_and_login(client, 'foo', 'default')
+    api_add_message(client, 'api the message by foo')
+    api_logout(client)
+    api_register_and_login(client, 'bar', 'default')
+    api_add_message(client, 'api the message by bar')
+    rv = client.get('/api/statuses/public_timeline')
+    assert b'api the message by foo' in rv.data
+    assert b'api the message by bar' in rv.data
+
+    # bar's timeline should just show bar's message
+    rv = client.get('/api/statuses/home_timeline')
+    assert b'api the message by foo' not in rv.data
+    assert b'api the message by bar' in rv.data
+
+    # now let's follow foo
+    my_message = []
+    my_message.append({"whom_id": "foo"})
+    rv = client.post('/api/friendships/create', data=json.dumps(my_message),
+                     content_type='application/json')
+    assert b'successfulFollow' in rv.data
+    assert b'foo' in rv.data
+
+    # we should now see foo's message
+    rv = client.get('/api/statuses/home_timeline')
+    assert b'api the message by foo' in rv.data
+    assert b'api the message by bar' in rv.data
+
+    # but on the user's page we only want the user's message
+    rv = client.get('/api/statuses/user_timeline/bar')
+    assert b'api the message by foo' not in rv.data
+    assert b'api the message by bar' in rv.data
+    rv = client.get('/api/statuses/user_timeline/foo')
+    assert b'api the message by foo' in rv.data
+    assert b'api the message by bar' not in rv.data
+
+    # now unfollow and check if that worked
+    rv = client.delete('/api/friendships/foo', data=json.dumps(my_message),
+                       content_type='application/json')
+    assert b'successfulUnfollow' in rv.data
+    assert b'foo' in rv.data
+    rv = client.get('/api/statuses/home_timeline')
+    assert b'api the message by foo' not in rv.data
+    assert b'api the message by bar' in rv.data
+
+
+'''
+----------------------------
+| END: New API Unit Tests
+----------------------------
+'''
+
+

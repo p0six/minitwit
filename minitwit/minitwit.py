@@ -261,7 +261,7 @@ def api_follow_user():
     if whom_id is None:
         abort(404)
     query_follow_user(session['user_id'], whom_id)
-    return redirect(url_for('api_user_timeline', username=username))
+    return Response(json.dumps({'status': 'successfulFollow', 'whom': username}), 200, mimetype='application/json')
 
 
 # remove the authenticated user from the followers of username
@@ -273,7 +273,7 @@ def api_unfollow_user(username):
     if whom_id is None:
         abort(404)
     query_unfollow_user(session['user_id'], whom_id)
-    return redirect(url_for('api_user_timeline', username=username), code=303)
+    return Response(json.dumps({'status': 'successfulUnfollow', 'whom': username}), 200, mimetype='application/json')
 
 
 # post a new message from the authenticated user
@@ -284,7 +284,7 @@ def api_add_message():
     message_text = request.get_json()[0]["message"]
     if message_text:
         query_add_message(session['user_id'], message_text)
-    return redirect(url_for('api_home_timeline'), code=303)
+    return Response(json.dumps({'status': 'successfulMessage'}), 200, mimetype='application/json')
 
 
 # log in the specified user
@@ -294,25 +294,23 @@ def api_login():
         return redirect(url_for('api_home_timeline'))
     error = None
     if request.method == 'GET':
-        # json_data = request.get_json()
         my_args = request.args.to_dict();
-        print my_args["username"]
-        user = query_login(my_args["username"])
+        user = query_login(my_args['username'])
         if user is None:
             error = 'Invalid username'
         elif not check_password_hash(user['pw_hash'], my_args["password"]):
             error = 'Invalid password'
         else:
             session['user_id'] = user['user_id']
-            return redirect(url_for('api_home_timeline'))
-    return 'not logged in'
+            return Response(json.dumps({'username': my_args['username'], 'status': 'loginSuccessful'}), 200, mimetype='application/json')
+    return Response(json.dumps({'status': 'loginFailure', 'error': error}), 401, mimetype='application/json')
 
 
 # log out the specified user
 @app.route('/api/account/verify_credentials', methods=['DELETE'])
 def api_logout():
     session.pop('user_id', None)
-    return redirect(url_for('api_public_timeline'), code=303)
+    return Response(json.dumps({'status': 'logoutSuccessful'}), 200, mimetype='application/json')
 
 
 '''
