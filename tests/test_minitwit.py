@@ -71,9 +71,9 @@ def add_message(client, text):
 
 
 '''
---------------------------------------
-| BEGIN: API Testing Assist Functions
---------------------------------------
+----------------------------------------
+| BEGIN: API Unit Test Helper Functions
+----------------------------------------
 '''
 
 
@@ -109,7 +109,7 @@ def api_add_message(client, text):
 
 '''
 --------------------------------------
-| END: API Testing Assist Functions
+| END: API Unit Test Helper Functions
 --------------------------------------
 '''
 
@@ -196,7 +196,7 @@ def test_timelines(client):
 
 '''
 ----------------------------
-| BEGIN: New API Unit Tests
+| BEGIN: API Unit Tests
 ----------------------------
 '''
 
@@ -272,7 +272,7 @@ def test_api_timelines(client):
 
 '''
 ----------------------------
-| END: New API Unit Tests
+| END: API Unit Tests
 ----------------------------
 '''
 
