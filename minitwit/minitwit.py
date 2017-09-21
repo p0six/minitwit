@@ -74,7 +74,7 @@ def initdb_command():
 def populate_db():
     """Initializes the database."""
     db = get_db()
-    with app.open_resource('populate.sql', mode='r') as f:
+    with app.open_resource('population.sql', mode='r') as f:
         db.cursor().executescript(f.read())
     db.commit()
 
