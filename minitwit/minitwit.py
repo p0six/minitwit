@@ -112,92 +112,129 @@ def before_request():
                           [session['user_id']], one=True)
 
 
-@app.route('/')
-def timeline():
-    """Shows a users timeline or if no user is logged in it will
-    redirect to the public timeline.  This timeline shows the user's
-    messages as well as all the messages of followed users.
-    """
-    if not g.user:
-        return redirect(url_for('public_timeline'))
-    return render_template('timeline.html', messages=query_db('''
-        select message.*, user.* from message, user
-        where message.author_id = user.user_id and (
-            user.user_id = ? or
-            user.user_id in (select whom_id from follower
-                                    where who_id = ?))
-        order by message.pub_date desc limit ?''',
-        [session['user_id'], session['user_id'], PER_PAGE]))
-
+'''
+--------------------------
+| BEGIN Query Definitions
+| - We define a set of queries to be used by both our HTML and JSON responses
+--------------------------
 '''
 
-Begin a bunch of my junk
----------------------
-magic below
------------
-return jsonify(username=g.user.username,
-                   email=g.user.email,
-                   id=g.user.id)
+
+def query_home_timeline(user_id):
+    return query_db('''
+            select message.*, user.* from message, user
+            where message.author_id = user.user_id and (
+                user.user_id = ? or
+                user.user_id in (select whom_id from follower where who_id = ?))
+            order by message.pub_date desc limit ?''',
+                        [user_id, user_id, PER_PAGE])
+
+
+def query_public_timeline():
+    return query_db('''
+          select message.*, user.* from message, user
+          where message.author_id = user.user_id
+          order by message.pub_date desc limit ?''', [PER_PAGE])
+
+
+def query_profile_user(username):
+    return query_db('select * from user where username = ?',
+                    [username], one=True)
+
+
+def query_followed(username, profile_username):
+    return query_db('''select 1 from follower where
+                follower.who_id = ? and follower.whom_id = ?''',
+                    [username, profile_username],
+                    one=True) is not None
+
+
+def query_messages(username):
+    return query_db('''
+                select message.*, user.* from message, user where
+                user.user_id = message.author_id and user.user_id = ?
+                order by message.pub_date desc limit ?''',
+                    [username, PER_PAGE])
+
+
+def query_follow_user(username, whom_id):
+    db = get_db()
+    db.execute('insert into follower (who_id, whom_id) values (?, ?)',
+               [username, whom_id])
+    db.commit()
+
+
+def query_unfollow_user(username, whom_id):
+    db = get_db()
+    db.execute('delete from follower where who_id=? and whom_id=?',
+               [username, whom_id])
+    db.commit()
+
+
+def query_add_message(username, message_text):
+    db = get_db()
+    db.execute('''insert into message (author_id, text, pub_date)
+          values (?, ?, ?)''', (username, message_text,
+                                int(time.time())))
+    db.commit()
+
+
+def query_login(username):
+    return query_db('''select * from user where
+            username = ?''', [username], one=True)
 
 
 '''
+------------------------
+| END Query Definitions
+--------------
+------------------
+| BEGIN API Functions
+| - We define a set of API functions, as specified in our requirements document
+------------------
+'''
+
 
 # show the timeline for the authenticated user
 @app.route('/api/statuses/home_timeline', methods=['GET'])
 def api_home_timeline():
     if not g.user:
         return redirect(url_for('api_public_timeline'))
-    messages = query_db('''
-            select message.*, user.* from message, user
-            where message.author_id = user.user_id and (
-                user.user_id = ? or
-                user.user_id in (select whom_id from follower where who_id = ?))
-            order by message.pub_date desc limit ?''',
-                        [session['user_id'], session['user_id'], PER_PAGE])
+    messages = query_home_timeline(session['user_id'])
     my_values = []
     for message in messages:
         my_values.append(
             {'username': message[5], 'email': message[6], 'text': message[2], 'datetime': format_datetime(message[3])})
     return Response(json.dumps(my_values), 200, mimetype='application/json');
+
 
 # show the public timeline for everyone
 @app.route('/api/statuses/public_timeline', methods=['GET','DELETE'])
 def api_public_timeline():
-    messages = query_db('''
-          select message.*, user.* from message, user
-          where message.author_id = user.user_id
-          order by message.pub_date desc limit ?''', [PER_PAGE])
+    messages = query_public_timeline()
     my_values = []
     for message in messages:
         my_values.append(
             {'username': message[5], 'email': message[6], 'text': message[2], 'datetime': format_datetime(message[3])})
     return Response(json.dumps(my_values), 200, mimetype='application/json');
 
+
 # show messages posted by username
 @app.route('/api/statuses/user_timeline/<username>', methods=['GET'])
-def api_user_timeline(username):
-    profile_user = query_db('select * from user where username = ?',
-                            [username], one=True)
+def api_user_timeline(username):  # query_profile_user, query_followed, query_messages
+    profile_user = query_profile_user(username)
     if profile_user is None:
         abort(404)
     followed = False
     if g.user:
-        followed = query_db('''select 1 from follower where
-                follower.who_id = ? and follower.whom_id = ?''',
-                [session['user_id'], profile_user['user_id']],
-                one=True) is not None
-    messages=query_db('''
-                select message.*, user.* from message, user where
-                user.user_id = message.author_id and user.user_id = ?
-                order by message.pub_date desc limit ?''',
-                [profile_user['user_id'], PER_PAGE])
-    # in the original template, if a user is logged in, there is additional text displaying whether or not you're
-    # following the user, or if the user is you
+        followed = query_followed(session['user_id'], profile_user['user_id'])
+    messages = query_messages(profile_user['user_id'])
     my_values = []
     for message in messages:
         my_values.append(
             {'username': message[5], 'email': message[6], 'text': message[2], 'datetime': format_datetime(message[3])})
     return Response(json.dumps(my_values), 200, mimetype='application/json');
+
 
 # add the authenticated user to the followers of the specified user
 @app.route('/api/friendships/create', methods=['POST'])
@@ -208,11 +245,9 @@ def api_follow_user():
     whom_id = get_user_id(username)
     if whom_id is None:
         abort(404)
-    db = get_db()
-    db.execute('insert into follower (who_id, whom_id) values (?, ?)',
-              [session['user_id'], whom_id])
-    db.commit()
+    query_follow_user(session['user_id'], whom_id)
     return redirect(url_for('api_user_timeline', username=username))
+
 
 # remove the authenticated user from the followers of username
 @app.route('/api/friendships/<username>', methods=['DELETE'])
@@ -222,11 +257,9 @@ def api_unfollow_user(username):
     whom_id = get_user_id(username)
     if whom_id is None:
         abort(404)
-    db = get_db()
-    db.execute('delete from follower where who_id=? and whom_id=?',
-              [session['user_id'], whom_id])
-    db.commit()
+    query_unfollow_user(session['user_id'], whom_id)
     return redirect(url_for('api_user_timeline', username=username), code=303)
+
 
 # post a new message from the authenticated user
 @app.route('/api/statuses/update', methods=['POST'])
@@ -235,88 +268,8 @@ def api_add_message():
         abort(401)
     message_text = request.get_json()[0]["message"]
     if message_text:
-        db = get_db()
-        db.execute('''insert into message (author_id, text, pub_date)
-          values (?, ?, ?)''', (session['user_id'], message_text,
-                                int(time.time())))
-        db.commit()
+        query_add_message(session['user_id'], message_text)
     return redirect(url_for('api_home_timeline'), code=303)
-
-@app.route('/public')
-def public_timeline():
-    """Displays the latest messages of all users."""
-    return render_template('timeline.html', messages=query_db('''
-        select message.*, user.* from message, user
-        where message.author_id = user.user_id
-        order by message.pub_date desc limit ?''', [PER_PAGE]))
-
-
-@app.route('/<username>')
-def user_timeline(username):
-    """Display's a users tweets."""
-    profile_user = query_db('select * from user where username = ?',
-                            [username], one=True)
-    if profile_user is None:
-        abort(404)
-    followed = False
-    if g.user:
-        followed = query_db('''select 1 from follower where
-            follower.who_id = ? and follower.whom_id = ?''',
-            [session['user_id'], profile_user['user_id']],
-            one=True) is not None
-    return render_template('timeline.html', messages=query_db('''
-            select message.*, user.* from message, user where
-            user.user_id = message.author_id and user.user_id = ?
-            order by message.pub_date desc limit ?''',
-            [profile_user['user_id'], PER_PAGE]), followed=followed,
-            profile_user=profile_user)
-
-
-@app.route('/<username>/follow')
-def follow_user(username):
-    """Adds the current user as follower of the given user."""
-    if not g.user:
-        abort(401)
-    whom_id = get_user_id(username)
-    if whom_id is None:
-        abort(404)
-    db = get_db()
-    db.execute('insert into follower (who_id, whom_id) values (?, ?)',
-              [session['user_id'], whom_id])
-    db.commit()
-    flash('You are now following "%s"' % username)
-    return redirect(url_for('user_timeline', username=username))
-
-
-@app.route('/<username>/unfollow')
-def unfollow_user(username):
-    """Removes the current user as follower of the given user."""
-    if not g.user:
-        abort(401)
-    whom_id = get_user_id(username)
-    if whom_id is None:
-        abort(404)
-    db = get_db()
-    db.execute('delete from follower where who_id=? and whom_id=?',
-              [session['user_id'], whom_id])
-    db.commit()
-    flash('You are no longer following "%s"' % username)
-    return redirect(url_for('user_timeline', username=username))
-
-
-@app.route('/add_message', methods=['POST'])
-def add_message():
-    """Registers a new message for the user."""
-    if 'user_id' not in session:
-        abort(401)
-    if request.form['text']:
-        db = get_db()
-        db.execute('''insert into message (author_id, text, pub_date)
-          values (?, ?, ?)''', (session['user_id'], request.form['text'],
-                                int(time.time())))
-        db.commit()
-        flash('Your message was recorded')
-    return redirect(url_for('timeline'))
 
 
 # log in the specified user
@@ -329,8 +282,7 @@ def api_login():
         # json_data = request.get_json()
         my_args = request.args.to_dict();
         print my_args["username"]
-        user = query_db('''select * from user where
-            username = ?''', [my_args["username"]], one=True)
+        user = query_login(my_args["username"])
         if user is None:
             error = 'Invalid username'
         elif not check_password_hash(user['pw_hash'], my_args["password"]):
@@ -340,11 +292,88 @@ def api_login():
             return redirect(url_for('api_home_timeline'))
     return 'not logged in'
 
+
 # log out the specified user
 @app.route('/api/account/verify_credentials', methods=['DELETE'])
 def api_logout():
     session.pop('user_id', None)
     return redirect(url_for('api_public_timeline'), code=303)
+
+
+'''
+------------------------
+| END API Functions 
+------------------------
+'''
+
+
+@app.route('/')
+def timeline():
+    """Shows a users timeline or if no user is logged in it will
+    redirect to the public timeline.  This timeline shows the user's
+    messages as well as all the messages of followed users.
+    """
+    if not g.user:
+        return redirect(url_for('public_timeline'))
+    return render_template('timeline.html', messages=query_home_timeline(session['user_id']))
+
+
+@app.route('/public')
+def public_timeline():
+    """Displays the latest messages of all users."""
+    messages = query_public_timeline()
+    return render_template('timeline.html', messages=query_public_timeline())
+
+
+@app.route('/<username>')
+def user_timeline(username):
+    """Display's a users tweets."""
+    profile_user = query_db('select * from user where username = ?',
+                            [username], one=True)
+    if profile_user is None:
+        abort(404)
+    followed = False
+    if g.user:
+        followed = query_followed(session['user_id'], profile_user['user_id'])
+    return render_template('timeline.html', messages=query_messages(profile_user['user_id']), followed=followed, profile_user=profile_user)
+
+
+@app.route('/<username>/follow')
+def follow_user(username):
+    """Adds the current user as follower of the given user."""
+    if not g.user:
+        abort(401)
+    whom_id = get_user_id(username)
+    if whom_id is None:
+        abort(404)
+    query_follow_user(username, whom_id)
+    flash('You are now following "%s"' % username)
+    return redirect(url_for('user_timeline', username=username))
+
+
+@app.route('/<username>/unfollow')
+def unfollow_user(username):
+    """Removes the current user as follower of the given user."""
+    if not g.user:
+        abort(401)
+    whom_id = get_user_id(username)
+    if whom_id is None:
+        abort(404)
+    query_unfollow_user(username, whom_id)
+    flash('You are no longer following "%s"' % username)
+    return redirect(url_for('user_timeline', username=username))
+
+
+@app.route('/add_message', methods=['POST'])
+def add_message():
+    """Registers a new message for the user."""
+    if 'user_id' not in session:
+        abort(401)
+    if request.form['text']:
+        query_add_message(session['user_id'], request.form['text'])
+        flash('Your message was recorded')
+    return redirect(url_for('timeline'))
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -353,8 +382,7 @@ def login():
         return redirect(url_for('timeline'))
     error = None
     if request.method == 'POST':
-        user = query_db('''select * from user where
-            username = ?''', [request.form['username']], one=True)
+        user = query_login(request.form['username'])
         if user is None:
             error = 'Invalid username'
         elif not check_password_hash(user['pw_hash'],
