@@ -157,17 +157,17 @@ def query_messages(username):
                     [username, PER_PAGE])
 
 
-def query_follow_user(username, whom_id):
+def query_follow_user(user_id, whom_id):
     db = get_db()
     db.execute('insert into follower (who_id, whom_id) values (?, ?)',
-               [username, whom_id])
+               [user_id, whom_id])
     db.commit()
 
 
-def query_unfollow_user(username, whom_id):
+def query_unfollow_user(user_id, whom_id):
     db = get_db()
     db.execute('delete from follower where who_id=? and whom_id=?',
-               [username, whom_id])
+               [user_id, whom_id])
     db.commit()
 
 
@@ -346,7 +346,7 @@ def follow_user(username):
     whom_id = get_user_id(username)
     if whom_id is None:
         abort(404)
-    query_follow_user(username, whom_id)
+    query_follow_user(session['user_id'], whom_id)
     flash('You are now following "%s"' % username)
     return redirect(url_for('user_timeline', username=username))
 
@@ -359,7 +359,7 @@ def unfollow_user(username):
     whom_id = get_user_id(username)
     if whom_id is None:
         abort(404)
-    query_unfollow_user(username, whom_id)
+    query_unfollow_user(session['user_id'], whom_id)
     flash('You are no longer following "%s"' % username)
     return redirect(url_for('user_timeline', username=username))
 
