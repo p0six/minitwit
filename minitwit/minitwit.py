@@ -220,6 +220,7 @@ def api_public_timeline():
 
 
 # show messages posted by username
+# TODO: currently not doing anything with 'profile_user' or 'followed' here. Could consider adding to JSON response?
 @app.route('/api/statuses/user_timeline/<username>', methods=['GET'])
 def api_user_timeline(username):  # query_profile_user, query_followed, query_messages
     profile_user = query_profile_user(username)
