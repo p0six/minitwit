@@ -64,6 +64,13 @@ def initdb_command():
     print('Initialized the database.')
 
 
+'''
+--------------------
+| BEGIN populatedb
+--------------------
+'''
+
+
 def populate_db():
     """Initializes the database."""
     db = get_db()
@@ -77,6 +84,13 @@ def populatedb_command():
     """Populate the database tables."""
     populate_db()
     print('Populated the database.')
+
+
+'''
+--------------------
+| END populatedb
+--------------------
+'''
 
 
 def query_db(query, args=(), one=False):
@@ -142,19 +156,19 @@ def query_profile_user(username):
                     [username], one=True)
 
 
-def query_followed(username, profile_username):
+def query_followed(user_id, profile_username):
     return query_db('''select 1 from follower where
                 follower.who_id = ? and follower.whom_id = ?''',
-                    [username, profile_username],
+                    [user_id, profile_username],
                     one=True) is not None
 
 
-def query_messages(username):
+def query_messages(user_id):
     return query_db('''
                 select message.*, user.* from message, user where
                 user.user_id = message.author_id and user.user_id = ?
                 order by message.pub_date desc limit ?''',
-                    [username, PER_PAGE])
+                    [user_id, PER_PAGE])
 
 
 def query_follow_user(user_id, whom_id):
@@ -171,10 +185,10 @@ def query_unfollow_user(user_id, whom_id):
     db.commit()
 
 
-def query_add_message(username, message_text):
+def query_add_message(user_id, message_text):
     db = get_db()
     db.execute('''insert into message (author_id, text, pub_date)
-          values (?, ?, ?)''', (username, message_text,
+          values (?, ?, ?)''', (user_id, message_text,
                                 int(time.time())))
     db.commit()
 
