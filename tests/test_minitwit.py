@@ -241,7 +241,7 @@ def test_api_timelines(client):
 
     # now let's follow foo
     my_message = []
-    my_message.append({"whom_id": "foo"})
+    my_message.append({"username": "foo"})
     rv = client.post('/api/friendships/create', data=json.dumps(my_message),
                      content_type='application/json')
     assert b'successfulFollow' in rv.data

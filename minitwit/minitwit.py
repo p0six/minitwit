@@ -256,7 +256,7 @@ def api_user_timeline(username):  # query_profile_user, query_followed, query_me
 def api_follow_user():
     if not g.user:
         abort(401)
-    username = request.get_json()[0]["whom_id"]
+    username = request.get_json()[0]["username"]
     whom_id = get_user_id(username)
     if whom_id is None:
         abort(404)
